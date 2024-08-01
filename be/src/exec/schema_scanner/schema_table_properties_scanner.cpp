@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#include "exec/schema_scanner/schema_table_options_scanner.h"
+#include "exec/schema_scanner/schema_table_properties_scanner.h"
 
 #include "runtime/client_cache.h"
 #include "runtime/exec_env.h"
@@ -26,28 +26,24 @@
 #include "vec/data_types/data_type_factory.hpp"
 
 namespace doris {
-std::vector<SchemaScanner::ColumnDesc> SchemaTableOptionsScanner::_s_tbls_columns = {
+std::vector<SchemaScanner::ColumnDesc> SchemaTablePropertiesScanner::_s_tbls_columns = {
         {"TABLE_CATALOG", TYPE_VARCHAR, sizeof(StringRef), true},
         {"TABLE_SCHEMA", TYPE_VARCHAR, sizeof(StringRef), true},
         {"TABLE_NAME", TYPE_VARCHAR, sizeof(StringRef), true},
-        {"TABLE_MODEL", TYPE_STRING, sizeof(StringRef), true},
-        {"TABLE_MODEL_KEY", TYPE_STRING, sizeof(StringRef), true},
-        {"DISTRIBUTE_KEY", TYPE_STRING, sizeof(StringRef), true},
-        {"DISTRIBUTE_TYPE", TYPE_STRING, sizeof(StringRef), true},
-        {"BUCKETS_NUM", TYPE_INT, sizeof(int32_t), true},
-        {"PARTITION_NUM", TYPE_INT, sizeof(int32_t), true},
+        {"PROPERTY_NAME", TYPE_STRING, sizeof(StringRef), true},
+        {"PROPERTY_VALUE", TYPE_STRING, sizeof(StringRef), true},
 };
 
-SchemaTableOptionsScanner::SchemaTableOptionsScanner()
-        : SchemaScanner(_s_tbls_columns, TSchemaTableType::SCH_TABLE_OPTIONS) {}
+SchemaTablePropertiesScanner::SchemaTablePropertiesScanner()
+        : SchemaScanner(_s_tbls_columns, TSchemaTableType::SCH_TABLE_PROPERTIES) {}
 
-Status SchemaTableOptionsScanner::start(RuntimeState* state) {
+Status SchemaTablePropertiesScanner::start(RuntimeState* state) {
     _block_rows_limit = state->batch_size();
     _rpc_timeout_ms = state->execution_timeout() * 1000;
     return Status::OK();
 }
 
-Status SchemaTableOptionsScanner::get_block_from_fe() {
+Status SchemaTablePropertiesScanner::get_block_from_fe() {
     TNetworkAddress master_addr = ExecEnv::GetInstance()->master_info()->network_address;
 
     TSchemaTableRequestParams schema_table_request_params;
@@ -58,7 +54,7 @@ Status SchemaTableOptionsScanner::get_block_from_fe() {
     schema_table_request_params.__set_current_user_ident(*_param->common_param->current_user_ident);
 
     TFetchSchemaTableDataRequest request;
-    request.__set_schema_table_name(TSchemaTableName::TABLE_OPTIONS);
+    request.__set_schema_table_name(TSchemaTableName::TABLE_PROPERTIES);
     request.__set_schema_table_params(schema_table_request_params);
 
     TFetchSchemaTableDataResult result;
@@ -77,14 +73,14 @@ Status SchemaTableOptionsScanner::get_block_from_fe() {
     }
     std::vector<TRow> result_data = result.data_batch;
 
-    _tableoptions_block = vectorized::Block::create_unique();
+    _tableproperties_block = vectorized::Block::create_unique();
     for (int i = 0; i < _s_tbls_columns.size(); ++i) {
         TypeDescriptor descriptor(_s_tbls_columns[i].type);
         auto data_type = vectorized::DataTypeFactory::instance().create_data_type(descriptor, true);
-        _tableoptions_block->insert(vectorized::ColumnWithTypeAndName(
+        _tableproperties_block->insert(vectorized::ColumnWithTypeAndName(
                 data_type->create_column(), data_type, _s_tbls_columns[i].name));
     }
-    _tableoptions_block->reserve(_block_rows_limit);
+    _tableproperties_block->reserve(_block_rows_limit);
     if (result_data.size() > 0) {
         int col_size = result_data[0].column_value.size();
         if (col_size != _s_tbls_columns.size()) {
@@ -95,14 +91,14 @@ Status SchemaTableOptionsScanner::get_block_from_fe() {
     for (int i = 0; i < result_data.size(); i++) {
         TRow row = result_data[i];
         for (int j = 0; j < _s_tbls_columns.size(); j++) {
-            RETURN_IF_ERROR(insert_block_column(row.column_value[j], j, _tableoptions_block.get(),
-                                                _s_tbls_columns[j].type));
+            RETURN_IF_ERROR(insert_block_column(
+                    row.column_value[j], j, _tableproperties_block.get(), _s_tbls_columns[j].type));
         }
     }
     return Status::OK();
 }
 
-Status SchemaTableOptionsScanner::get_next_block_internal(vectorized::Block* block, bool* eos) {
+Status SchemaTablePropertiesScanner::get_next_block_internal(vectorized::Block* block, bool* eos) {
     if (!_is_init) {
         return Status::InternalError("Used before initialized.");
     }
@@ -111,9 +107,9 @@ Status SchemaTableOptionsScanner::get_next_block_internal(vectorized::Block* blo
         return Status::InternalError("input pointer is nullptr.");
     }
 
-    if (_tableoptions_block == nullptr) {
+    if (_tableproperties_block == nullptr) {
         RETURN_IF_ERROR(get_block_from_fe());
-        _total_rows = _tableoptions_block->rows();
+        _total_rows = _tableproperties_block->rows();
     }
 
     if (_row_idx == _total_rows) {
@@ -123,7 +119,7 @@ Status SchemaTableOptionsScanner::get_next_block_internal(vectorized::Block* blo
 
     int current_batch_rows = std::min(_block_rows_limit, _total_rows - _row_idx);
     vectorized::MutableBlock mblock = vectorized::MutableBlock::build_mutable_block(block);
-    RETURN_IF_ERROR(mblock.add_rows(_tableoptions_block.get(), _row_idx, current_batch_rows));
+    RETURN_IF_ERROR(mblock.add_rows(_tableproperties_block.get(), _row_idx, current_batch_rows));
     _row_idx += current_batch_rows;
 
     *eos = _row_idx == _total_rows;

@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-suite("test_table_options") {
-    def dbName = "test_table_options_db"
+suite("test_table_properties") {
+    def dbName = "test_table_properties_db"
     sql "drop database if exists ${dbName}"
     sql "CREATE DATABASE IF NOT EXISTS ${dbName}"
     sql "use ${dbName}"
@@ -177,9 +177,10 @@ suite("test_table_options") {
         );
     """
 
-    qt_select """select * from information_schema.table_options where table_schema=\"${dbName}\" order by TABLE_NAME; """
+    qt_select """select count(*) from information_schema.table_properties where table_schema=\"${dbName}\"; """
+    qt_select """select * from information_schema.table_properties where table_schema=\"${dbName}\" ORDER BY TABLE_NAME, PROPERTY_NAME ASC; """
     sql """
         drop table test_row_column_page_size2;
     """    
-    qt_select """select * from information_schema.table_options where table_schema=\"${dbName}\" order by TABLE_NAME; """    
+    qt_select """select * from information_schema.table_properties where table_schema=\"${dbName}\" ORDER BY TABLE_NAME, PROPERTY_NAME ASC; """       
 }

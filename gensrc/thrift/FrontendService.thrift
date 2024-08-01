@@ -1003,6 +1003,7 @@ enum TSchemaTableName {
   WORKLOAD_SCHEDULE_POLICY = 5,
   TABLE_OPTIONS = 6,
   WORKLOAD_GROUP_PRIVILEGES = 7,
+  TABLE_PROPERTIES,
 }
 
 struct TMetadataTableRequestParams {

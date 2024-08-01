@@ -90,7 +90,6 @@ import org.apache.logging.log4j.Logger;
 import org.apache.thrift.TException;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -114,6 +113,8 @@ public class MetadataGenerator {
     private static final ImmutableMap<String, Integer> TABLE_OPTIONS_COLUMN_TO_INDEX;
 
     private static final ImmutableMap<String, Integer> WORKLOAD_GROUP_PRIVILEGES_COLUMN_TO_INDEX;
+
+    private static final ImmutableMap<String, Integer> TABLE_PROPERTIES_COLUMN_TO_INDEX;
 
     static {
         ImmutableMap.Builder<String, Integer> activeQueriesbuilder = new ImmutableMap.Builder();
@@ -155,6 +156,13 @@ public class MetadataGenerator {
             wgPrivsBuilder.put(wgPrivsColList.get(i).getName().toLowerCase(), i);
         }
         WORKLOAD_GROUP_PRIVILEGES_COLUMN_TO_INDEX = wgPrivsBuilder.build();
+
+        ImmutableMap.Builder<String, Integer> propertiesBuilder = new ImmutableMap.Builder();
+        List<Column> propertiesColList = SchemaTable.TABLE_MAP.get("table_properties").getFullSchema();
+        for (int i = 0; i < propertiesColList.size(); i++) {
+            propertiesBuilder.put(propertiesColList.get(i).getName().toLowerCase(), i);
+        }
+        TABLE_PROPERTIES_COLUMN_TO_INDEX = propertiesBuilder.build();
     }
 
     public static TFetchSchemaTableDataResult getMetadataTable(TFetchSchemaTableDataRequest request) throws TException {
@@ -241,6 +249,10 @@ public class MetadataGenerator {
             case WORKLOAD_GROUP_PRIVILEGES:
                 result = workloadGroupPrivsMetadataResult(schemaTableParams);
                 columnIndex = WORKLOAD_GROUP_PRIVILEGES_COLUMN_TO_INDEX;
+                break;
+            case TABLE_PROPERTIES:
+                result = tablePropertiesMetadataResult(schemaTableParams);
+                columnIndex = TABLE_PROPERTIES_COLUMN_TO_INDEX;
                 break;
             default:
                 return errorResult("invalid schema table name.");
@@ -1036,7 +1048,8 @@ public class MetadataGenerator {
         if (!params.isSetCurrentUserIdent()) {
             return errorResult("current user ident is not set.");
         }
-
+        TUserIdentity tcurrentUserIdentity = params.getCurrentUserIdent();
+        UserIdentity currentUserIdentity = UserIdentity.fromThrift(tcurrentUserIdentity);
         TFetchSchemaTableDataResult result = new TFetchSchemaTableDataResult();
         List<TRow> dataBatch = Lists.newArrayList();
         List<Long> catalogIds = Env.getCurrentEnv().getCatalogMgr().getCatalogIds();
@@ -1051,10 +1064,16 @@ public class MetadataGenerator {
                         continue;
                     }
                     OlapTable olapTable = (OlapTable) table;
+
+                    if (!Env.getCurrentEnv().getAccessManager().checkTblPriv(currentUserIdentity, catalog.getName(),
+                            database.getFullName(), table.getName(), PrivPredicate.SHOW)) {
+                        continue;
+                    }
                     TRow trow = new TRow();
-                    trow.addToColumnValue(new TCell().setStringVal(table.getName())); // TABLE_NAME
+
                     trow.addToColumnValue(new TCell().setStringVal(catalog.getName())); // TABLE_CATALOG
                     trow.addToColumnValue(new TCell().setStringVal(database.getFullName())); // TABLE_SCHEMA
+                    trow.addToColumnValue(new TCell().setStringVal(table.getName())); // TABLE_NAME
                     trow.addToColumnValue(
                             new TCell().setStringVal(olapTable.getKeysType().toMetadata())); // TABLE_MODEL
                     trow.addToColumnValue(
@@ -1084,18 +1103,62 @@ public class MetadataGenerator {
                     }
                     trow.addToColumnValue(new TCell().setIntVal(distributionInfo.getBucketNum())); // BUCKETS_NUM
                     trow.addToColumnValue(new TCell().setIntVal(olapTable.getPartitionNum())); // PARTITION_NUM
+                    dataBatch.add(trow);
+                } // for table
+            } // for db
+        } // for catalog
+        result.setDataBatch(dataBatch);
+        result.setStatus(new TStatus(TStatusCode.OK));
+        return result;
+    }
+
+    private static TFetchSchemaTableDataResult tablePropertiesMetadataResult(TSchemaTableRequestParams params) {
+        if (!params.isSetCurrentUserIdent()) {
+            return errorResult("current user ident is not set.");
+        }
+        TUserIdentity tcurrentUserIdentity = params.getCurrentUserIdent();
+        UserIdentity currentUserIdentity = UserIdentity.fromThrift(tcurrentUserIdentity);
+        TFetchSchemaTableDataResult result = new TFetchSchemaTableDataResult();
+        List<TRow> dataBatch = Lists.newArrayList();
+        List<Long> catalogIds = Env.getCurrentEnv().getCatalogMgr().getCatalogIds();
+        for (Long catalogId : catalogIds) {
+            CatalogIf catalog = Env.getCurrentEnv().getCatalogMgr().getCatalog(catalogId);
+            List<Long> dbIds = catalog.getDbIds();
+            for (Long dbId : dbIds) {
+                DatabaseIf database = catalog.getDbNullable(dbId);
+                List<TableIf> tables = database.getTables();
+                for (TableIf table : tables) {
+                    if (!(table instanceof OlapTable)) {
+                        continue;
+                    }
+                    OlapTable olapTable = (OlapTable) table;
+                    if (!Env.getCurrentEnv().getAccessManager().checkTblPriv(currentUserIdentity, catalog.getName(),
+                            database.getFullName(), table.getName(), PrivPredicate.SHOW)) {
+                        continue;
+                    }
                     TableProperty property = olapTable.getTableProperty();
                     if (property == null) {
-                        trow.addToColumnValue(new TCell().setStringVal("")); // PROPERTIES
-                    } else {
-                        try {
-                            trow.addToColumnValue(
-                                    new TCell().setStringVal(property.getPropertiesString())); // PROPERTIES
-                        } catch (IOException e) {
-                            return errorResult(e.getMessage());
-                        }
+                        // if there is no properties, then write empty properties and check next table.
+                        TRow trow = new TRow();
+                        trow.addToColumnValue(new TCell().setStringVal(catalog.getName())); // TABLE_CATALOG
+                        trow.addToColumnValue(new TCell().setStringVal(database.getFullName())); // TABLE_SCHEMA
+                        trow.addToColumnValue(new TCell().setStringVal(table.getName())); // TABLE_NAME
+                        trow.addToColumnValue(new TCell().setStringVal("")); // PROPERTIES_NAME
+                        trow.addToColumnValue(new TCell().setStringVal("")); // PROPERTIES_VALUE
+                        dataBatch.add(trow);
+                        continue;
                     }
-                    dataBatch.add(trow);
+
+                    Map<String, String>  propertiesMap = property.getProperties();
+                    propertiesMap.forEach((key, value) -> {
+                        TRow trow = new TRow();
+                        trow.addToColumnValue(new TCell().setStringVal(catalog.getName())); // TABLE_CATALOG
+                        trow.addToColumnValue(new TCell().setStringVal(database.getFullName())); // TABLE_SCHEMA
+                        trow.addToColumnValue(new TCell().setStringVal(table.getName())); // TABLE_NAME
+                        trow.addToColumnValue(new TCell().setStringVal(key)); // PROPERTIES_NAME
+                        trow.addToColumnValue(new TCell().setStringVal(value)); // PROPERTIES_VALUE
+                        dataBatch.add(trow);
+                    });
                 } // for table
             } // for db
         } // for catalog
