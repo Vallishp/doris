@@ -224,6 +224,7 @@ public class FunctionSet<T> {
     public static final String ORTHOGONAL_BITMAP_EXPR_CALCULATE = "orthogonal_bitmap_expr_calculate";
 
     public static final String QUANTILE_UNION = "quantile_union";
+    public static final String EVERY = "every";
     //TODO(weixiang): is quantile_percent can be replaced by approx_percentile?
     public static final String QUANTILE_PERCENT = "quantile_percent";
     public static final String TO_QUANTILE_STATE = "to_quantile_state";
@@ -1467,6 +1468,16 @@ public class FunctionSet<T> {
         addBuiltin(AggregateFunction.createBuiltin(QUANTILE_UNION, Lists.newArrayList(Type.QUANTILE_STATE),
                 Type.QUANTILE_STATE,
                 Type.QUANTILE_STATE,
+                "",
+                "",
+                "",
+                "",
+                "",
+                true, false, true, true));
+
+        addBuiltin(AggregateFunction.createBuiltin(EVERY, Lists.newArrayList(Type.BOOLEAN),
+                Type.BOOLEAN,
+                Type.BOOLEAN,
                 "",
                 "",
                 "",

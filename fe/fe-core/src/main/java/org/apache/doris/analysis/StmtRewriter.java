@@ -1587,6 +1587,7 @@ public class StmtRewriter {
             case HLL_UNION:
             case BITMAP_UNION:
             case QUANTILE_UNION:
+            case EVERY:
                 FunctionName funcName = new FunctionName(aggregateType.toString().toLowerCase());
                 return new FunctionCallExpr(funcName, new FunctionParams(false, Lists.newArrayList(slot)));
             case GENERIC:

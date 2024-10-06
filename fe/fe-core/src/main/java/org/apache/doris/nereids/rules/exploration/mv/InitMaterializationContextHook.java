@@ -252,7 +252,8 @@ public class InitMaterializationContextHook implements PlannerHook {
                         case MIN:
                         case HLL_UNION:
                         case BITMAP_UNION:
-                        case QUANTILE_UNION: {
+                        case QUANTILE_UNION:
+                        case EVERY: {
                             aggColumnsStringBuilder
                                     .append(String.format("%s(%s), ", aggregateType, col.getName()));
                             break;

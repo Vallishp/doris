@@ -37,7 +37,8 @@ public enum AggregateType {
     NONE("NONE"),
     BITMAP_UNION("BITMAP_UNION"),
     QUANTILE_UNION("QUANTILE_UNION"),
-    GENERIC("GENERIC");
+    GENERIC("GENERIC"),
+    EVERY("EVERY");
 
     private static EnumMap<AggregateType, EnumSet<PrimitiveType>> compatibilityMap;
 
@@ -53,6 +54,7 @@ public enum AggregateType {
         aggTypeMap.put("HLL_UNION", AggregateType.HLL_UNION);
         aggTypeMap.put("BITMAP_UNION", AggregateType.BITMAP_UNION);
         aggTypeMap.put("QUANTILE_UNION", AggregateType.QUANTILE_UNION);
+        aggTypeMap.put("EVERY", AggregateType.EVERY);
     }
 
     static {
@@ -134,6 +136,10 @@ public enum AggregateType {
         primitiveTypeList.add(PrimitiveType.QUANTILE_STATE);
         compatibilityMap.put(QUANTILE_UNION, EnumSet.copyOf(primitiveTypeList));
 
+        primitiveTypeList.clear();
+        primitiveTypeList.add(PrimitiveType.BOOLEAN);
+        compatibilityMap.put(EVERY, EnumSet.copyOf(primitiveTypeList));
+
         compatibilityMap.put(NONE, EnumSet.copyOf(excObjectStored));
     }
 
@@ -190,6 +196,8 @@ public enum AggregateType {
                 return TAggregationType.BITMAP_UNION;
             case QUANTILE_UNION:
                 return TAggregationType.QUANTILE_UNION;
+            case EVERY:
+                return TAggregationType.EVERY;
             default:
                 return null;
         }

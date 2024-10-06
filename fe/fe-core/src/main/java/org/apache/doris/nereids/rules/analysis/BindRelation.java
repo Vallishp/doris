@@ -60,6 +60,7 @@ import org.apache.doris.nereids.trees.expressions.SlotReference;
 import org.apache.doris.nereids.trees.expressions.functions.AggCombinerFunctionBuilder;
 import org.apache.doris.nereids.trees.expressions.functions.FunctionBuilder;
 import org.apache.doris.nereids.trees.expressions.functions.agg.BitmapUnion;
+import org.apache.doris.nereids.trees.expressions.functions.agg.Every;
 import org.apache.doris.nereids.trees.expressions.functions.agg.HllUnion;
 import org.apache.doris.nereids.trees.expressions.functions.agg.Max;
 import org.apache.doris.nereids.trees.expressions.functions.agg.Min;
@@ -332,6 +333,8 @@ public class BindRelation extends OneAnalysisRuleFactory {
                 return new BitmapUnion(slot);
             case QUANTILE_UNION:
                 return new QuantileUnion(slot);
+            case EVERY:
+                return new Every(slot);
             case GENERIC:
                 Type type = column.getType();
                 if (!type.isAggStateType()) {

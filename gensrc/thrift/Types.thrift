@@ -189,7 +189,8 @@ enum TAggregationType {
     NONE,
     BITMAP_UNION,
     REPLACE_IF_NOT_NULL,
-    QUANTILE_UNION
+    QUANTILE_UNION,
+    EVERY
 }
 
 enum TPushType {
