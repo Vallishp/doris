@@ -51,10 +51,10 @@ public class Every extends AggregateFunction
     }
 
     /**
-     * constructor with 2 arguments.
+     * constructor with 1 arguments.
      */
-    private Every(boolean distinct, Expression arg0, Expression arg1) {
-        super("every", distinct, arg0, arg1);
+    private Every(boolean distinct, Expression arg) {
+        super("every", distinct, arg);
     }
 
     /**
