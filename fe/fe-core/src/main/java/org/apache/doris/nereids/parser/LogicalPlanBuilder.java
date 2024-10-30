@@ -157,6 +157,7 @@ import org.apache.doris.nereids.DorisParser.QualifiedNameContext;
 import org.apache.doris.nereids.DorisParser.QueryContext;
 import org.apache.doris.nereids.DorisParser.QueryOrganizationContext;
 import org.apache.doris.nereids.DorisParser.QueryTermContext;
+import org.apache.doris.nereids.DorisParser.RecoverDatabaseContext;
 import org.apache.doris.nereids.DorisParser.RefreshMTMVContext;
 import org.apache.doris.nereids.DorisParser.RefreshMethodContext;
 import org.apache.doris.nereids.DorisParser.RefreshScheduleContext;
@@ -409,6 +410,7 @@ import org.apache.doris.nereids.trees.plans.commands.ExplainCommand.ExplainLevel
 import org.apache.doris.nereids.trees.plans.commands.ExportCommand;
 import org.apache.doris.nereids.trees.plans.commands.LoadCommand;
 import org.apache.doris.nereids.trees.plans.commands.PauseMTMVCommand;
+import org.apache.doris.nereids.trees.plans.commands.RecoverDatabaseCommand;
 import org.apache.doris.nereids.trees.plans.commands.RefreshMTMVCommand;
 import org.apache.doris.nereids.trees.plans.commands.ReplayCommand;
 import org.apache.doris.nereids.trees.plans.commands.ResumeMTMVCommand;
@@ -3965,5 +3967,19 @@ public class LogicalPlanBuilder extends DorisParserBaseVisitor<Object> {
     @Override
     public SetDefaultStorageVaultCommand visitSetDefaultStorageVault(SetDefaultStorageVaultContext ctx) {
         return new SetDefaultStorageVaultCommand(stripQuotes(ctx.identifier().getText()));
+    }
+
+    @Override
+    public LogicalPlan visitRecoverDatabase(RecoverDatabaseContext ctx) {
+        String dbName = ctx.name.getText();
+        long dbId = -1;
+        if (ctx.id != null) {
+            dbId = Long.parseLong(ctx.id.getText());
+        }
+        String newDbName = null;
+        if (ctx.alias != null) {
+            newDbName = ctx.alias.getText();
+        }
+        return new RecoverDatabaseCommand(dbName, dbId, newDbName);
     }
 }

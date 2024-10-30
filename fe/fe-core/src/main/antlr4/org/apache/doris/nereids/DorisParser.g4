@@ -55,6 +55,7 @@ statementBase
     | supportedDropStatement            #supportedDropStatementAlias
     | supportedSetStatement             #supportedSetStatementAlias
     | unsupportedStatement              #unsupported
+    | supportedRecoverStatement         #supportedRecoverStatementAlias
     ;
 
 unsupportedStatement
@@ -447,9 +448,12 @@ unsupportedCancelStatement
     | CANCEL WARM UP JOB wildWhere?                                                 #cancelWarmUp
     ;
 
-unsupportedRecoverStatement
+supportedRecoverStatement
     : RECOVER DATABASE name=identifier id=INTEGER_VALUE? (AS alias=identifier)?     #recoverDatabase
-    | RECOVER TABLE name=multipartIdentifier
+    ;
+
+unsupportedRecoverStatement
+    :RECOVER TABLE name=multipartIdentifier
         id=INTEGER_VALUE? (AS alias=identifier)?                                    #recoverTable
     | RECOVER PARTITION name=identifier id=INTEGER_VALUE? (AS alias=identifier)?
         FROM tableName=multipartIdentifier                                          #recoverPartition
