@@ -24,25 +24,23 @@ suite("test_recover_db") {
     sql "CREATE DATABASE IF NOT EXISTS $db "
     sql "use $db "
     sql """
-        CREATE TABLE IF NOT EXISTS table1 (
-            `actorid` varchar(128),
-            `gameid` varchar(128),
-            `eventtime` datetimev2(3)
-        )
-        engine=olap
-        duplicate key(actorid, gameid, eventtime)
-        partition by range(eventtime)(
-            from ("2000-01-01") to ("2021-01-01") interval 1 year,
-            from ("2021-01-01") to ("2022-01-01") interval 1 MONth,
-            from ("2022-01-01") to ("2023-01-01") interval 1 WEEK,
-            from ("2023-01-01") TO ("2023-02-01") interval 1 DAY
-        )
-        distributed by hash(actorid) buckets 1
-        properties(
-            "replication_num"="1",
-            "light_schema_change"="true",
-            "compression"="zstd"
-        );
+    create table table1 (
+        `id` int(11),
+        `name` varchar(128),
+        `da` date
+    )
+    engine=olap
+    duplicate key(id)
+    partition by range(da)(
+        PARTITION p3 VALUES LESS THAN ('2023-01-01'),
+        PARTITION p4 VALUES LESS THAN ('2024-01-01'),
+        PARTITION p5 VALUES LESS THAN ('2025-01-01')
+    )
+    distributed by hash(id) buckets 2
+    properties(
+        "replication_num"="1",
+        "light_schema_change"="true"
+    );
     """
     sql """
         CREATE TABLE IF NOT EXISTS table2 (
@@ -65,6 +63,28 @@ suite("test_recover_db") {
             "compression"="zstd"
         );
     """
+      
+    sql """ insert into table1 values(1, 'a', '2022-01-02'); """
+    sql """ insert into table1 values(2, 'a', '2023-01-02'); """
+    sql """ insert into table1 values(3, 'a', '2024-01-02'); """
+    sql """ SYNC;"""
+
+    qt_select_check_1 """ select * from  table1 order by id,name,da; """
+    
+    sql " drop table table1"
+    sql " recover table table1 as table10"
+    qt_select_check_1 """ select * from  table10 order by id,name,da; """
+    
+    sql " drop table table10"
+    sql " recover table table10 as table1"
+    qt_select_check_1 """ select * from  table1 order by id,name,da; """
+
+    sql " drop table table1"
+    sql " recover table table1"
+    qt_select_check_1 """ select * from  table1 order by id,name,da; """
+
+    sql " use $db"
+
     qt_select "show tables";
     
     sql " drop database $db"

@@ -450,12 +450,12 @@ unsupportedCancelStatement
 
 supportedRecoverStatement
     : RECOVER DATABASE name=identifier id=INTEGER_VALUE? (AS alias=identifier)?     #recoverDatabase
+    | RECOVER TABLE name=multipartIdentifier
+        id=INTEGER_VALUE? (AS alias=identifier)?                                    #recoverTable           
     ;
 
 unsupportedRecoverStatement
-    :RECOVER TABLE name=multipartIdentifier
-        id=INTEGER_VALUE? (AS alias=identifier)?                                    #recoverTable
-    | RECOVER PARTITION name=identifier id=INTEGER_VALUE? (AS alias=identifier)?
+    : RECOVER PARTITION name=identifier id=INTEGER_VALUE? (AS alias=identifier)?
         FROM tableName=multipartIdentifier                                          #recoverPartition
     ;
 
